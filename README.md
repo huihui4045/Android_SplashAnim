@@ -5,4 +5,3 @@ Android_SplashAnim
 
 ![](/image/demo1.png)
 
-![](/demo1.mp4)
