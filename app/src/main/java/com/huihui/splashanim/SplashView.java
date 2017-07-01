@@ -1,5 +1,7 @@
 package com.huihui.splashanim;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
@@ -7,6 +9,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
+import android.view.animation.OvershootInterpolator;
 
 /**
  * Created by gavin
@@ -19,8 +22,8 @@ public class SplashView extends View {
     private  ValueAnimator mAnimator;
     // 小圆圈的颜色列表，在initialize方法里面初始化
     private int[] mCircleColors;
-    private Paint mPaint;
-    private Paint mPaintBackground;
+    private Paint mPaint=new Paint();
+    private Paint mPaintBackground=new Paint();
 
     // 大圆(里面包含很多小圆的)的半径
     private float mRotationRadius = 90;
@@ -94,6 +97,25 @@ public class SplashView extends View {
 
     }
 
+    /****
+     * 开启聚合动画
+     */
+    public void splashDisappear() {
+
+        if (mState!=null && mState instanceof RotateState){
+
+            ((RotateState) mState).cancel();
+
+            post(new Runnable() {
+                @Override
+                public void run() {
+
+                    mState=new MergingState();
+                }
+            });
+        }
+    }
+
     /*****
      * 旋转动画
      */
@@ -136,6 +158,86 @@ public class SplashView extends View {
         }
     }
 
+
+    /*****
+     * 聚合动画
+     */
+    private class MergingState extends SplashState{
+
+        public MergingState() {
+            //
+            mAnimator=ValueAnimator.ofFloat(mRotationRadius,0);
+
+            mAnimator.setDuration(mRotationDuration);
+            mAnimator.setInterpolator(new OvershootInterpolator(20f));
+            mAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator animation) {
+
+                    mCurrentRotationRadius= (float) animation.getAnimatedValue();
+
+                    invalidate();
+                }
+            });
+
+            mAnimator.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    super.onAnimationEnd(animation);
+
+                    mState=new ExpandState();
+                }
+            });
+
+
+            mAnimator.start();
+        }
+
+        @Override
+        public void drawState(Canvas canvas) {
+
+            drawBackground(canvas);
+
+            drawCircles(canvas);
+
+
+            //mAnimator.reverse();
+        }
+    }
+
+    /****
+     * 扩散动画
+     * 画一个空心圆  设置画笔粗细
+     * 空心圆变化范围
+     */
+    private class ExpandState extends SplashState {
+
+        public ExpandState() {
+            //计算某个时刻大圆的半径是多少
+            mAnimator=ValueAnimator.ofFloat(0,mDiagonalDist);
+            mAnimator.setDuration(mRotationDuration);
+            mAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator animation) {
+                    //当前空心圆的半径
+                mHoleRadius= (float) animation.getAnimatedValue();
+
+                    invalidate();
+                }
+            });
+
+            mAnimator.start();
+        }
+
+        @Override
+        public void drawState(Canvas canvas) {
+
+            drawBackground(canvas);
+        }
+    }
+
+
+
     private void drawCircles(Canvas canvas) {
 
         //每个小圆之间的间隔角度 = 2π/小圆的个数
@@ -159,12 +261,12 @@ public class SplashView extends View {
 
 
         if(mHoleRadius>0f){//空心圆初始半径
-            /*//得到画笔的宽度 = 对角线/2 - 空心圆的半径
+            //得到画笔的宽度 = 对角线/2 - 空心圆的半径
             float strokeWidth = mDiagonalDist - mHoleRadius;
             mPaintBackground.setStrokeWidth(strokeWidth);
             //画圆的半径 = 空心圆的半径 + 画笔的宽度/2
             float radius = mHoleRadius + strokeWidth/2;
-            canvas.drawCircle(mCenterX,mCenterY,radius,mPaintBackground);*/
+            canvas.drawCircle(mCenterX,mCenterY,radius,mPaintBackground);
         }else {
 
             canvas.drawColor(mSplashBgColor);
@@ -177,6 +279,7 @@ public class SplashView extends View {
     private abstract  class SplashState{
         public abstract  void drawState(Canvas canvas);
     }
+
 
 
 }
